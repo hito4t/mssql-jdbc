@@ -3164,6 +3164,51 @@ public class SQLServerConnection implements ISQLServerConnection {
         return st;
     }
 
+    private String convertSql(PreparedStatement st, String sql) throws SQLServerException {
+        SQLServerParameterMetaData parameterMetaData = (SQLServerParameterMetaData)((SQLServerPreparedStatement)st).getParameterMetaData();
+        boolean containDatetime = false;
+        boolean[] isDatetime = new boolean[parameterMetaData.getParameterCount()];
+        for (int i = 0; i < parameterMetaData.getParameterCount(); i++) {
+        	if (parameterMetaData.getParameterTypeName(i + 1).equals("datetime")) {
+        		isDatetime[i] = true;
+        		containDatetime = true;
+        	}
+        }
+
+        if (containDatetime) {
+        	//System.out.println("!!!");
+            int nParams = 0;
+
+            // Figure out the expected number of parameters by counting the
+            // parameter placeholders in the SQL string.
+            int offset = -1;
+            while ((offset = ParameterUtils.scanSQLForChar('?', sql, ++offset)) < sql.length())
+                ++nParams;
+
+            int index = 0;
+            int pos = 0;
+            int next;
+            StringBuilder newSql = new StringBuilder();
+            while ((next = ParameterUtils.scanSQLForChar('?', sql, pos)) < sql.length()) {
+            	newSql.append(sql.substring(pos, next));
+            	if (isDatetime[index++]) {
+            		newSql.append("CAST(? AS datetime)");
+            	} else {
+            		newSql.append("?");
+            	}
+            	//System.out.println("#" + sql.substring(pos, next));
+            	//System.out.println("?");
+            	pos = next + 1;
+            }
+            newSql.append(sql.substring(pos));
+        	//System.out.println("#" + sql.substring(pos));
+
+        	System.out.println("# " + sql +  " -> " + newSql);
+        	return newSql.toString();
+        }
+        return null;
+    }
+
     public PreparedStatement prepareStatement(String sql,
             int resultSetType,
             int resultSetConcurrency) throws SQLServerException {
@@ -3181,6 +3226,18 @@ public class SQLServerConnection implements ISQLServerConnection {
         else {
             st = new SQLServerPreparedStatement(this, sql, resultSetType, resultSetConcurrency,
                     SQLServerStatementColumnEncryptionSetting.UseConnectionSetting);
+        }
+
+        String newSql = convertSql(st, sql);
+        if (newSql != null) {
+            if (Util.use42Wrapper()) {
+                st = new SQLServerPreparedStatement42(this, newSql, resultSetType, resultSetConcurrency,
+                        SQLServerStatementColumnEncryptionSetting.UseConnectionSetting);
+            }
+            else {
+                st = new SQLServerPreparedStatement(this, newSql, resultSetType, resultSetConcurrency,
+                        SQLServerStatementColumnEncryptionSetting.UseConnectionSetting);
+            }
         }
 
         loggerExternal.exiting(getClassNameLogging(), "prepareStatement", st);
@@ -3203,6 +3260,16 @@ public class SQLServerConnection implements ISQLServerConnection {
         }
         else {
             st = new SQLServerPreparedStatement(this, sql, resultSetType, resultSetConcurrency, stmtColEncSetting);
+        }
+
+        String newSql = convertSql(st, sql);
+        if (newSql != null) {
+            if (Util.use42Wrapper()) {
+                st = new SQLServerPreparedStatement42(this, newSql, resultSetType, resultSetConcurrency, stmtColEncSetting);
+            }
+            else {
+                st = new SQLServerPreparedStatement(this, newSql, resultSetType, resultSetConcurrency, stmtColEncSetting);
+            }
         }
 
         loggerExternal.exiting(getClassNameLogging(), "prepareStatement", st);
@@ -4653,6 +4720,16 @@ public class SQLServerConnection implements ISQLServerConnection {
         }
         else {
             st = new SQLServerPreparedStatement(this, sql, nType, nConcur, stmtColEncSetting);
+        }
+
+        String newSql = convertSql(st, sql);
+        if (newSql != null) {
+            if (Util.use42Wrapper()) {
+                st = new SQLServerPreparedStatement42(this, newSql, nType, nConcur, stmtColEncSetting);
+            }
+            else {
+                st = new SQLServerPreparedStatement(this, newSql, nType, nConcur, stmtColEncSetting);
+            }
         }
 
         loggerExternal.exiting(getClassNameLogging(), "prepareStatement", st);
