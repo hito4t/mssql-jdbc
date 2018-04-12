@@ -35,14 +35,19 @@ import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Struct;
+import java.text.DateFormat;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Executor;
@@ -52,12 +57,12 @@ import java.util.logging.Level;
 
 import javax.sql.XAConnection;
 
-import org.ietf.jgss.GSSCredential;
-import org.ietf.jgss.GSSException;
-
 import mssql.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap;
 import mssql.googlecode.concurrentlinkedhashmap.ConcurrentLinkedHashMap.Builder;
 import mssql.googlecode.concurrentlinkedhashmap.EvictionListener;
+
+import org.ietf.jgss.GSSCredential;
+import org.ietf.jgss.GSSException;
 
 /**
  * SQLServerConnection implements a JDBC connection to SQL Server. SQLServerConnections support JDBC connection pooling and may be either physical
@@ -3164,6 +3169,8 @@ public class SQLServerConnection implements ISQLServerConnection {
         return st;
     }
 
+    private static Set<String> loggedSQLs = new HashSet<String>();
+    
     private String convertSql(PreparedStatement st, String sql) throws SQLServerException {
         SQLServerParameterMetaData parameterMetaData = (SQLServerParameterMetaData)((SQLServerPreparedStatement)st).getParameterMetaData();
         boolean containDatetime = false;
@@ -3176,15 +3183,6 @@ public class SQLServerConnection implements ISQLServerConnection {
         }
 
         if (containDatetime) {
-        	//System.out.println("!!!");
-            int nParams = 0;
-
-            // Figure out the expected number of parameters by counting the
-            // parameter placeholders in the SQL string.
-            int offset = -1;
-            while ((offset = ParameterUtils.scanSQLForChar('?', sql, ++offset)) < sql.length())
-                ++nParams;
-
             int index = 0;
             int pos = 0;
             int next;
@@ -3196,14 +3194,18 @@ public class SQLServerConnection implements ISQLServerConnection {
             	} else {
             		newSql.append("?");
             	}
-            	//System.out.println("#" + sql.substring(pos, next));
-            	//System.out.println("?");
             	pos = next + 1;
             }
             newSql.append(sql.substring(pos));
-        	//System.out.println("#" + sql.substring(pos));
-
-        	System.out.println("# " + sql +  " -> " + newSql);
+            
+            boolean notLogged;
+            synchronized (loggedSQLs) {
+            	notLogged = loggedSQLs.add(sql);
+            }
+            if (notLogged) {
+            	DateFormat df = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+            	System.out.println(df.format(new Date()) + " " + getClass().getName() + " \"" + sql +  "\" -> \"" + newSql + "\"");
+            }
         	return newSql.toString();
         }
         return null;
