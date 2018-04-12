@@ -12,7 +12,10 @@ import java.sql.DriverManager;
 import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
+import java.text.DateFormat;
 import java.text.MessageFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.Locale;
 import java.util.Properties;
@@ -484,6 +487,9 @@ public final class SQLServerDriver implements java.sql.Driver {
         instanceID = nextInstanceID();
         traceID = "SQLServerDriver:" + instanceID;
         loggingClassName = "com.microsoft.sqlserver.jdbc." + "SQLServerDriver:" + instanceID;
+        
+    	DateFormat df = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+    	System.out.println(df.format(new Date()) + " " + getClass().getName() + " SQL Server JDBC Driver datetime patch version.");
     }
 
     // Helper function used to fixup the case sensitivity, synonyms and remove unknown tokens from the
