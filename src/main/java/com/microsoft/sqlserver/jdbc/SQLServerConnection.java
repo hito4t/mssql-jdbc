@@ -3172,7 +3172,20 @@ public class SQLServerConnection implements ISQLServerConnection {
     private static Set<String> loggedSQLs = new HashSet<String>();
     
     private String convertSql(PreparedStatement st, String sql) throws SQLServerException {
-        SQLServerParameterMetaData parameterMetaData = (SQLServerParameterMetaData)((SQLServerPreparedStatement)st).getParameterMetaData();
+        SQLServerParameterMetaData parameterMetaData;
+        try {
+        	parameterMetaData = (SQLServerParameterMetaData)((SQLServerPreparedStatement)st).getParameterMetaData();
+        } catch (SQLServerException e) {
+            boolean notLogged;
+            synchronized (loggedSQLs) {
+            	notLogged = loggedSQLs.add(sql);
+            }
+            if (notLogged) {
+            	DateFormat df = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+            	System.out.println(df.format(new Date()) + " " + getClass().getName() + " [WARN] cannot getParameterMetaData of \"" + sql +  "\" : " + e);
+            }
+            return null;
+        }
         boolean containDatetime = false;
         boolean[] isDatetime = new boolean[parameterMetaData.getParameterCount()];
         for (int i = 0; i < parameterMetaData.getParameterCount(); i++) {
@@ -3204,7 +3217,7 @@ public class SQLServerConnection implements ISQLServerConnection {
             }
             if (notLogged) {
             	DateFormat df = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-            	System.out.println(df.format(new Date()) + " " + getClass().getName() + " \"" + sql +  "\" -> \"" + newSql + "\"");
+            	System.out.println(df.format(new Date()) + " " + getClass().getName() + " [INFO] converted \"" + sql +  "\" -> \"" + newSql + "\"");
             }
         	return newSql.toString();
         }
